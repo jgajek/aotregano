@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/AOTregano.Core/AOTregano.Core.csproj" />
+  <Project Path="src/AOTregano.Cli/AOTregano.Cli.csproj" />
+  <Project Path="src/AOTregano.Mcp/AOTregano.Mcp.csproj" />
+  <Project Path="tests/AOTregano.Tests/AOTregano.Tests.csproj" />
+</Solution>

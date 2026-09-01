@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and publish
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    strategy:
+      matrix:
+        include:
+          - runtime: win-x64
+            artifact: aotregano-win-x64.zip
+          - runtime: linux-x64
+            artifact: aotregano-linux-x64.tar.gz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+      - name: Publish CLI
+        run: >
+          dotnet publish src/AOTregano.Cli
+          -c Release -r ${{ matrix.runtime }}
+          -p:PublishSingleFile=true
+          -o publish/${{ matrix.runtime }}
+      - name: Publish MCP server
+        run: >
+          dotnet publish src/AOTregano.Mcp
+          -c Release -r ${{ matrix.runtime }}
+          -p:PublishSingleFile=true
+          -o publish/${{ matrix.runtime }}
+      - name: Check tag against executable
+        if: matrix.runtime == 'linux-x64'
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          reported="$(publish/linux-x64/aotregano --version)"
+          test "${TAG#v}" = "$reported"
+      - name: Package
+        run: |
+          cd publish/${{ matrix.runtime }}
+          rm -f *.pdb
+          cp ../../LICENSE ../../README.md .
+          cp -r ../../schema .
+          if [ "${{ matrix.runtime }}" = "win-x64" ]; then
+            zip -r ../../${{ matrix.artifact }} .
+          else
+            tar czf ../../${{ matrix.artifact }} .
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.runtime }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+      - name: Checksums
+        run: sha256sum aotregano-* > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            aotregano-*
+            SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          generate_release_notes: true

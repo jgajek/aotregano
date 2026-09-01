@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore AOTregano.slnx
+      - run: dotnet build AOTregano.slnx -c Release --no-restore
+      - run: dotnet test AOTregano.slnx -c Release --no-restore --no-build
+      - name: Verify CLI JSON failure contract
+        shell: bash
+        run: |
+          set +e
+          output="$(dotnet run --project src/AOTregano.Cli -c Release --no-build -- --json missing-file.dll)"
+          status=$?
+          set -e
+          test "$status" -eq 2
+          test "$(printf '%s\n' "$output" | wc -l)" -eq 1
+          printf '%s' "$output" | grep -q '"Schema":"aotregano.error/1"'
