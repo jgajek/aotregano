@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jgajek/aotregano/main/schema/error.schema.json",
+  "title": "AOTregano error",
+  "type": "object",
+  "required": [
+    "Schema", "ToolVersion", "Success", "ErrorKind", "Error",
+    "InputPath", "InputSha256", "InputLength", "MoreWorkPossible"
+  ],
+  "properties": {
+    "Schema": { "const": "aotregano.error/1" },
+    "ToolVersion": { "type": "string" },
+    "Success": { "const": false },
+    "ErrorKind": {
+      "enum": [
+        "arguments", "input", "unsupported", "resourceLimit",
+        "hydrationFailed", "recoveryIncomplete", "parse", "io"
+      ]
+    },
+    "Error": { "type": "string" },
+    "InputPath": { "type": ["string", "null"] },
+    "InputSha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "InputLength": { "type": ["integer", "null"], "minimum": 0 },
+    "MoreWorkPossible": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

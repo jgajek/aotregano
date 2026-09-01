@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jgajek/aotregano/main/schema/run.schema.json",
+  "title": "AOTregano run manifest",
+  "type": "object",
+  "required": [
+    "Schema", "ToolVersion", "Success", "InputPath", "InputSha256",
+    "InputLength", "Format", "TargetOs", "Architecture", "ImageBase",
+    "EntryPoint", "MappedImageLength", "Recognition", "Hydration", "Recovery",
+    "Wrote", "ArtifactIntegrity", "Warnings", "Log", "Limitations", "Blockers",
+    "MoreWorkPossible"
+  ],
+  "properties": {
+    "Schema": { "const": "aotregano.run/1" },
+    "ToolVersion": { "type": "string" },
+    "Success": { "const": true },
+    "InputPath": { "type": "string" },
+    "InputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "InputLength": { "type": "integer", "minimum": 0 },
+    "Format": { "enum": ["pe", "elf"] },
+    "TargetOs": { "enum": ["windows", "linux"] },
+    "Architecture": { "const": "x64" },
+    "ImageBase": { "$ref": "#/$defs/address" },
+    "EntryPoint": { "$ref": "#/$defs/address" },
+    "MappedImageLength": { "type": "integer", "minimum": 1 },
+    "Recognition": {
+      "type": "object",
+      "required": [
+        "NativeAot", "ReadyToRunHeader", "MajorVersion", "MinorVersion",
+        "DirectoryEntrySize", "DirectoryEntryType", "Sections"
+      ],
+      "properties": {
+        "NativeAot": { "const": true },
+        "ReadyToRunHeader": { "$ref": "#/$defs/address" },
+        "MajorVersion": { "type": "integer", "minimum": 0 },
+        "MinorVersion": { "type": "integer", "minimum": 0 },
+        "DirectoryEntrySize": { "enum": [16, 24] },
+        "DirectoryEntryType": { "const": 1 },
+        "Sections": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": true
+    },
+    "Hydration": {
+      "type": "object",
+      "required": ["State", "BytesWritten"],
+      "properties": {
+        "State": { "enum": ["notRequired", "rehydrated"] },
+        "BytesWritten": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "Recovery": {
+      "type": "object",
+      "required": ["PointerCandidates", "MethodTables", "Strings", "Arrays", "Annotations"],
+      "properties": {
+        "PointerCandidates": { "type": "integer", "minimum": 0 },
+        "MethodTables": { "type": "integer", "minimum": 0 },
+        "Strings": { "type": "integer", "minimum": 0 },
+        "Arrays": { "type": "integer", "minimum": 0 },
+        "Annotations": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "Wrote": { "$ref": "#/$defs/paths" },
+    "ArtifactIntegrity": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/integrity" }
+    },
+    "Warnings": { "$ref": "#/$defs/messages" },
+    "Log": { "$ref": "#/$defs/messages" },
+    "Limitations": { "$ref": "#/$defs/messages" },
+    "Blockers": { "$ref": "#/$defs/messages" },
+    "MoreWorkPossible": { "type": "boolean" }
+  },
+  "$defs": {
+    "address": {
+      "type": "object",
+      "required": ["Value", "Hex"],
+      "properties": {
+        "Value": { "type": "integer", "minimum": 0 },
+        "Hex": { "type": "string", "pattern": "^0x[0-9A-F]+$" }
+      },
+      "additionalProperties": false
+    },
+    "messages": { "type": "array", "items": { "type": "string" } },
+    "paths": {
+      "type": "object",
+      "required": [
+        "Analysis", "Sections", "MethodTables", "Strings", "Arrays",
+        "Annotations", "MappedImage"
+      ],
+      "additionalProperties": { "type": "string" }
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["Path", "Length", "Sha256"],
+      "properties": {
+        "Path": { "type": "string" },
+        "Length": { "type": "integer", "minimum": 0 },
+        "Sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

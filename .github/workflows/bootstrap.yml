@@ -1,0 +1,27 @@
+name: Bootstrap exact local commit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - aotregano-main.bundle
+      - .github/workflows/bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify bundle and update main
+        run: |
+          git bundle verify aotregano-bootstrap.bundle
+          actual="$(git bundle list-heads aotregano-bootstrap.bundle refs/heads/bootstrap-target | cut -d' ' -f1)"
+          test -n "$actual"
+          git fetch aotregano-bootstrap.bundle refs/heads/bootstrap-target:refs/remotes/bundle/bootstrap-target
+          git push origin refs/remotes/bundle/bootstrap-target:refs/heads/main \
+            --force-with-lease=refs/heads/main:$GITHUB_SHA

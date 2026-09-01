@@ -427,3 +427,8 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Local validation outputs
+.manual-build/
+.dotnet-cli/
+.nuget-packages/
