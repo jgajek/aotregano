@@ -19,6 +19,12 @@ frozen-object region is already fully file-backed.
 > This project is under active development. Recovered images remain untrusted
 > executable content and must be handled like the original sample.
 
+## Documentation
+
+- [Analyst guide](docs/README.md) — capabilities, supported inputs, and a quick start
+- [How recovery works](docs/how-it-works.md) — the NativeAOT recovery pipeline in plain language
+- [Output reference](docs/output-reference.md) — bundle files, JSON fields, and interpretation notes
+
 ## Build
 
 The current development target is .NET 9:
