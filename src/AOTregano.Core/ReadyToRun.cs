@@ -232,7 +232,7 @@ public sealed record OrphanedReadyToRunDirectory(
 
     private static void AddMergedHydrationDestinations(
         MemoryImage memory,
-        ISet<ulong> destinations)
+        HashSet<ulong> destinations)
     {
         ReadOnlySpan<byte> name = "hydrated\0"u8;
         foreach (var container in memory.Sections.Where(section =>
