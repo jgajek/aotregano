@@ -25,7 +25,7 @@ public sealed record AOTreganoReport(
 
 public static class AOTreganoAnalyzer
 {
-    public const string Version = "0.2.0";
+    public const string Version = "0.1.0";
 
     public static AOTreganoReport Analyze(string path, ImageLimits? limits = null)
     {
