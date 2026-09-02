@@ -216,10 +216,11 @@ public sealed record OrphanedReadyToRunDirectory(
                         section.Type == ReadyToRunSectionType.FrozenObjectRegion);
                     var dehydrated = sections.Find(section =>
                         section.Type == ReadyToRunSectionType.DehydratedData);
-                    if (sections.Count >= 5 &&
-                        frozen is not null && IsFileBacked(memory, frozen) &&
-                        (dehydrated is null ||
-                         IsValidDehydratedAnchor(memory, dehydrated, destinations)))
+                    if (sections.Count >= (dehydrated is null ? 5 : 2) &&
+                        frozen is not null &&
+                        (dehydrated is not null
+                            ? IsValidDehydratedAnchor(memory, dehydrated, destinations)
+                            : IsFileBacked(memory, frozen)))
                     {
                         results.TryAdd(start, new OrphanedReadyToRunDirectory(start, sections));
                     }
