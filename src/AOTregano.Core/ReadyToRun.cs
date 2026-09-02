@@ -176,8 +176,6 @@ public sealed record OrphanedReadyToRunDirectory(
             .Select(section => checked(memory.ImageBase + section.VirtualAddress))
             .ToHashSet();
         AddMergedHydrationDestinations(memory, destinations);
-        if (destinations.Count == 0)
-            return [];
 
         var results = new Dictionary<ulong, OrphanedReadyToRunDirectory>();
         foreach (var container in memory.Sections.Where(section =>
@@ -189,10 +187,8 @@ public sealed record OrphanedReadyToRunDirectory(
             while (cursor <= containerEnd && containerEnd - cursor >= EntrySize)
             {
                 if (TryReadEntry(memory, cursor, out var anchor) &&
-                    anchor.Type == ReadyToRunSectionType.DehydratedData &&
-                    anchor.Size > 4 &&
-                    TryReadRelativePointer(memory, anchor.Start, out var destination) &&
-                    destinations.Contains(destination))
+                    (IsValidDehydratedAnchor(memory, anchor, destinations) ||
+                     IsValidFrozenAnchor(memory, anchor)))
                 {
                     var start = cursor;
                     var firstType = anchor.Type;
@@ -216,10 +212,14 @@ public sealed record OrphanedReadyToRunDirectory(
                         lastType = entry.Type;
                         entryAddress += EntrySize;
                     }
-                    if (sections.Any(section =>
-                            section.Type == ReadyToRunSectionType.FrozenObjectRegion) &&
-                        sections.Any(section =>
-                            section.Type == ReadyToRunSectionType.DehydratedData))
+                    var frozen = sections.Find(section =>
+                        section.Type == ReadyToRunSectionType.FrozenObjectRegion);
+                    var dehydrated = sections.Find(section =>
+                        section.Type == ReadyToRunSectionType.DehydratedData);
+                    if (sections.Count >= 5 &&
+                        frozen is not null && IsFileBacked(memory, frozen) &&
+                        (dehydrated is null ||
+                         IsValidDehydratedAnchor(memory, dehydrated, destinations)))
                     {
                         results.TryAdd(start, new OrphanedReadyToRunDirectory(start, sections));
                     }
@@ -228,6 +228,31 @@ public sealed record OrphanedReadyToRunDirectory(
             }
         }
         return results.Values.OrderBy(directory => directory.Address).ToArray();
+    }
+
+    private static bool IsValidDehydratedAnchor(
+        MemoryImage memory,
+        ReadyToRunSection section,
+        HashSet<ulong> destinations) =>
+        section.Type == ReadyToRunSectionType.DehydratedData &&
+        section.Size > 4 &&
+        TryReadRelativePointer(memory, section.Start, out var destination) &&
+        destinations.Contains(destination);
+
+    private static bool IsValidFrozenAnchor(
+        MemoryImage memory,
+        ReadyToRunSection section) =>
+        section.Type == ReadyToRunSectionType.FrozenObjectRegion &&
+        section.Size > 0 &&
+        IsFileBacked(memory, section);
+
+    private static bool IsFileBacked(MemoryImage memory, ReadyToRunSection section)
+    {
+        var parent = memory.SectionAt(section.Start);
+        if (parent is null || section.End <= section.Start || section.End < memory.ImageBase)
+            return false;
+        var endRva = section.End - memory.ImageBase;
+        return endRva <= parent.VirtualAddress + parent.RawSize;
     }
 
     private static void AddMergedHydrationDestinations(

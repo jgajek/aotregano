@@ -12,7 +12,9 @@ NativeAOT section directory, AOTregano can recover that orphaned directory by
 validating its ordered entries, mapped address ranges, frozen-object region,
 and dehydration stream. It recognizes both a zero-raw PE section named
 `hydrated` and an original `hydrated` linker contribution merged into a larger
-PE section, provided the file retains a validated linker section map.
+PE section, provided the file retains a validated linker section map. An
+orphaned directory without dehydrated data is accepted only when its
+frozen-object region is already fully file-backed.
 
 > This project is under active development. Recovered images remain untrusted
 > executable content and must be handled like the original sample.

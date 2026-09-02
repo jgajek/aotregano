@@ -191,6 +191,26 @@ public sealed class ReadyToRunTests
     }
 
     [Fact]
+    public void LocatesOrphanedDirectoryWhenHydrationIsNotRequired()
+    {
+        var bytes = new byte[0x1000];
+        var directory = Base + 0x100;
+        WriteDirectoryEntry(bytes, directory, 201, Base + 0x600, Base + 0x608);
+        WriteDirectoryEntry(bytes, directory + 24, 202, Base + 0x608, Base + 0x610);
+        WriteDirectoryEntry(bytes, directory + 48, 204, 0, 0);
+        WriteDirectoryEntry(bytes, directory + 72, 205, Base + 0x610, Base + 0x618);
+        WriteDirectoryEntry(bytes, directory + 96,
+            ReadyToRunSectionType.FrozenObjectRegion, Base + 0x700, Base + 0x780);
+        var memory = new MemoryImage(Base, bytes, [Section(bytes.Length)]);
+
+        var located = Assert.Single(OrphanedReadyToRunDirectory.Locate(memory));
+
+        Assert.Equal(directory, located.Address);
+        Assert.DoesNotContain(located.Sections, section =>
+            section.Type == ReadyToRunSectionType.DehydratedData);
+    }
+
+    [Fact]
     public void VaultRegressionWhenSampleIsAvailable()
     {
         var path = Environment.GetEnvironmentVariable("AOTREGANO_TEST_SAMPLE");
@@ -247,6 +267,24 @@ public sealed class ReadyToRunTests
         Assert.Contains(report.Strings, value =>
             value.Value ==
                 "nILHX1io7kbDMrbXDyfjcKoMxrqb8Y1JL/hhaxTXvMkyC1H7vZI/zm8v//6zMBhG");
+    }
+
+    [Fact]
+    public void OrphanedNoHydrationVaultRegressionWhenSampleIsAvailable()
+    {
+        var path = Environment.GetEnvironmentVariable(
+            "AOTREGANO_TEST_ORPHANED_NO_HYDRATION_SAMPLE");
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var report = AOTreganoAnalyzer.Analyze(path);
+
+        Assert.Null(report.Header);
+        Assert.Equal("orphanedSectionDirectory", report.RecognitionSource);
+        Assert.Equal(HydrationState.NotRequired, report.Hydration);
+        Assert.Equal(1_543, report.MethodTables.Count);
+        Assert.Equal(1_047, report.Strings.Count);
+        Assert.Equal(24, report.Arrays.Count);
     }
 
     private static MemoryImage Memory(byte[] entry, byte entrySize, ushort major)
