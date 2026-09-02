@@ -175,6 +175,7 @@ public sealed record OrphanedReadyToRunDirectory(
                 section.Name.Contains("hydrat", StringComparison.OrdinalIgnoreCase))
             .Select(section => checked(memory.ImageBase + section.VirtualAddress))
             .ToHashSet();
+        AddMergedHydrationDestinations(memory, destinations);
         if (destinations.Count == 0)
             return [];
 
@@ -227,6 +228,52 @@ public sealed record OrphanedReadyToRunDirectory(
             }
         }
         return results.Values.OrderBy(directory => directory.Address).ToArray();
+    }
+
+    private static void AddMergedHydrationDestinations(
+        MemoryImage memory,
+        ISet<ulong> destinations)
+    {
+        ReadOnlySpan<byte> name = "hydrated\0"u8;
+        foreach (var container in memory.Sections.Where(section =>
+                     section.IsInitialized && !section.IsExecutable &&
+                     section.RawSize <= int.MaxValue))
+        {
+            var containerAddress = checked(memory.ImageBase + container.VirtualAddress);
+            var data = memory.Read(containerAddress, checked((int)container.RawSize));
+            var consumed = 0;
+            while (consumed <= data.Length - name.Length)
+            {
+                var hit = data[consumed..].IndexOf(name);
+                if (hit < 0)
+                    break;
+                var nameOffset = consumed + hit;
+                if (nameOffset >= 8)
+                {
+                    var startRva = BinaryPrimitives.ReadUInt32LittleEndian(
+                        data.Slice(nameOffset - 8, 4));
+                    var size = BinaryPrimitives.ReadUInt32LittleEndian(
+                        data.Slice(nameOffset - 4, 4));
+                    ImageSection? parent = null;
+                    foreach (var section in memory.Sections)
+                    {
+                        if (section.VirtualAddress <= startRva &&
+                            size > 0 &&
+                            (ulong)startRva + size <= section.EndRva)
+                        {
+                            parent = section;
+                            break;
+                        }
+                    }
+                    if (parent is not null &&
+                        startRva >= parent.VirtualAddress + parent.RawSize)
+                    {
+                        destinations.Add(checked(memory.ImageBase + startRva));
+                    }
+                }
+                consumed = nameOffset + 1;
+            }
+        }
     }
 
     private static bool TryReadEntry(

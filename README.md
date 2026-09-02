@@ -10,7 +10,9 @@ sample as an assembly or invokes its code.
 When a protector or post-processor removes the `RTR` header but leaves the
 NativeAOT section directory, AOTregano can recover that orphaned directory by
 validating its ordered entries, mapped address ranges, frozen-object region,
-dehydration stream, and zero-raw `hydrated` destination.
+and dehydration stream. It recognizes both a zero-raw PE section named
+`hydrated` and an original `hydrated` linker contribution merged into a larger
+PE section, provided the file retains a validated linker section map.
 
 > This project is under active development. Recovered images remain untrusted
 > executable content and must be handled like the original sample.

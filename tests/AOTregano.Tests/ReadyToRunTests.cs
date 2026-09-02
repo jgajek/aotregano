@@ -159,6 +159,38 @@ public sealed class ReadyToRunTests
     }
 
     [Fact]
+    public void LocatesHydratedContributionMergedIntoDataSection()
+    {
+        var bytes = new byte[0x1000];
+        var directory = Base + 0x100;
+        var source = Base + 0x300;
+        var destination = Base + 0x700;
+        WriteDirectoryEntry(bytes, directory, ReadyToRunSectionType.FrozenObjectRegion,
+            destination + 0x20, destination + 0x40);
+        WriteDirectoryEntry(bytes, directory + 24, ReadyToRunSectionType.DehydratedData,
+            source, source + 7);
+        WriteI32(bytes, source, checked((int)(destination - source)));
+        bytes[Index(source + 4)] = (2 << 3) | MetadataRehydrator.Copy;
+        bytes[Index(source + 5)] = (byte)'O';
+        bytes[Index(source + 6)] = (byte)'K';
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x500), 0x700);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x504), 0x100);
+        "hydrated\0"u8.CopyTo(bytes.AsSpan(0x508));
+        var memory = new MemoryImage(Base, bytes,
+        [
+            new(".rdata", 0, 0x600, 0, 0x600, 0x4000_0040),
+            new(".data", 0x600, 0x200, 0x600, 0x100, 0xC000_0040)
+        ]);
+
+        var located = Assert.Single(OrphanedReadyToRunDirectory.Locate(memory));
+        var dehydrated = Assert.Single(located.Sections, section =>
+            section.Type == ReadyToRunSectionType.DehydratedData);
+        MetadataRehydrator.Rehydrate(memory, dehydrated);
+
+        Assert.Equal("OK"u8.ToArray(), memory.Read(destination, 2).ToArray());
+    }
+
+    [Fact]
     public void VaultRegressionWhenSampleIsAvailable()
     {
         var path = Environment.GetEnvironmentVariable("AOTREGANO_TEST_SAMPLE");
@@ -193,6 +225,28 @@ public sealed class ReadyToRunTests
         Assert.Equal(2_399, report.MethodTables.Count);
         Assert.Equal(1_163, report.Strings.Count);
         Assert.Equal(33, report.Arrays.Count);
+    }
+
+    [Fact]
+    public void MergedHydratedContributionVaultRegressionWhenSampleIsAvailable()
+    {
+        var path = Environment.GetEnvironmentVariable(
+            "AOTREGANO_TEST_MERGED_HYDRATED_SAMPLE");
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var report = AOTreganoAnalyzer.Analyze(path);
+
+        Assert.Null(report.Header);
+        Assert.Equal("orphanedSectionDirectory", report.RecognitionSource);
+        Assert.Equal(HydrationState.Rehydrated, report.Hydration);
+        Assert.Equal(0x41CC8UL, report.PointerScan.End - report.PointerScan.Start);
+        Assert.Equal(1_801, report.MethodTables.Count);
+        Assert.Equal(1_027, report.Strings.Count);
+        Assert.Equal(31, report.Arrays.Count);
+        Assert.Contains(report.Strings, value =>
+            value.Value ==
+                "nILHX1io7kbDMrbXDyfjcKoMxrqb8Y1JL/hhaxTXvMkyC1H7vZI/zm8v//6zMBhG");
     }
 
     private static MemoryImage Memory(byte[] entry, byte entrySize, ushort major)
