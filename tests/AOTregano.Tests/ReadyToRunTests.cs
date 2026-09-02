@@ -149,8 +149,8 @@ public sealed class ReadyToRunTests
         var memory = new MemoryImage(Base, bytes, sections);
 
         var located = Assert.Single(OrphanedReadyToRunDirectory.Locate(memory));
-        var dehydrated = Assert.Single(located.Sections.Where(section =>
-            section.Type == ReadyToRunSectionType.DehydratedData));
+        var dehydrated = Assert.Single(located.Sections, section =>
+            section.Type == ReadyToRunSectionType.DehydratedData);
         var result = MetadataRehydrator.Rehydrate(memory, dehydrated);
 
         Assert.Equal(directory, located.Address);
