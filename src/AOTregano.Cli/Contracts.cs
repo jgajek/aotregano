@@ -114,4 +114,4 @@ internal sealed record AnnotationRow(AddressValue Address, string Kind, string N
 [JsonSerializable(typeof(StringRow))]
 [JsonSerializable(typeof(ArrayRow))]
 [JsonSerializable(typeof(AnnotationRow))]
-internal partial class AOTreganoJsonContext : JsonSerializerContext;
+internal sealed partial class AOTreganoJsonContext : JsonSerializerContext;
