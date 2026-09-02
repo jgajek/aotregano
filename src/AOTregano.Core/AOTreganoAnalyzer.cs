@@ -36,7 +36,7 @@ public static class AOTreganoAnalyzer
             $"Loaded {image.TargetOs} {image.Format} image " +
             $"(base=0x{image.ImageBase:X}, entry=0x{image.EntryPoint:X}).");
         var headers = ReadyToRunHeader.Locate(memory);
-        var header = headers.FirstOrDefault();
+        var header = headers.Count == 0 ? null : headers[0];
         IReadOnlyList<ReadyToRunSection> sections;
         string recognitionSource;
         ulong directoryAddress;
@@ -51,9 +51,11 @@ public static class AOTreganoAnalyzer
         }
         else
         {
-            var orphaned = OrphanedReadyToRunDirectory.Locate(memory).FirstOrDefault()
-                ?? throw new UnsupportedImageException(
-                    "No supported ReadyToRun header or orphaned NativeAOT section directory was found.");
+            var orphanedDirectories = OrphanedReadyToRunDirectory.Locate(memory);
+            var orphaned = orphanedDirectories.Count == 0
+                ? throw new UnsupportedImageException(
+                    "No supported ReadyToRun header or orphaned NativeAOT section directory was found.")
+                : orphanedDirectories[0];
             sections = orphaned.Sections;
             recognitionSource = "orphanedSectionDirectory";
             directoryAddress = orphaned.Address;
@@ -122,7 +124,7 @@ public static class AOTreganoAnalyzer
         MemoryImage memory,
         PointerScan pointerScan,
         IReadOnlyList<string> layouts,
-        ICollection<string> log)
+        List<string> log)
     {
         var failures = new List<string>();
         foreach (var layout in layouts)
