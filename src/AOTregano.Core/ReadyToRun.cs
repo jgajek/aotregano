@@ -334,14 +334,14 @@ public static class MetadataRehydrator
             throw new InvalidDataException("Hydrated output exceeds its mapped destination.");
     }
 
-    private static void WriteI32(IBufferWriter<byte> writer, int value)
+    private static void WriteI32(ArrayBufferWriter<byte> writer, int value)
     {
         var span = writer.GetSpan(4);
         BinaryPrimitives.WriteInt32LittleEndian(span, value);
         writer.Advance(4);
     }
 
-    private static void WriteU64(IBufferWriter<byte> writer, ulong value)
+    private static void WriteU64(ArrayBufferWriter<byte> writer, ulong value)
     {
         var span = writer.GetSpan(8);
         BinaryPrimitives.WriteUInt64LittleEndian(span, value);
