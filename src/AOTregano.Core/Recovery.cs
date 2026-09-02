@@ -2,6 +2,7 @@ using System.Text;
 
 namespace AOTregano.Core;
 
+#pragma warning disable CA1720 // Names intentionally mirror NativeAOT runtime element types.
 public static class RuntimeElementType
 {
     public const int Boolean = 0x02;
@@ -50,6 +51,7 @@ public static class RuntimeElementType
         _ => "Type"
     };
 }
+#pragma warning restore CA1720
 
 public sealed class MethodTable
 {
