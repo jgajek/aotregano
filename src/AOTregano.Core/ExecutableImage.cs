@@ -39,6 +39,7 @@ public sealed class ExecutableImage
         int mappedSize,
         string format,
         string targetOs,
+        string architecture,
         IReadOnlyList<ImageSection> sections,
         byte[] file)
     {
@@ -48,6 +49,7 @@ public sealed class ExecutableImage
         MappedSize = mappedSize;
         Format = format;
         TargetOs = targetOs;
+        Architecture = architecture;
         Sections = sections;
         _file = file;
     }
@@ -58,7 +60,7 @@ public sealed class ExecutableImage
     public int MappedSize { get; }
     public string Format { get; }
     public string TargetOs { get; }
-    public string Architecture => "x64";
+    public string Architecture { get; }
     public IReadOnlyList<ImageSection> Sections { get; }
 
     public static ExecutableImage Open(string path, ImageLimits? limits = null)
@@ -158,7 +160,7 @@ public sealed class ExecutableImage
 
         return new ExecutableImage(
             path, imageBase, checked(imageBase + entryRva), mappedSize,
-            "pe", "windows", sections, file);
+            "pe", "windows", "x64", sections, file);
     }
 
     private static ExecutableImage ParseElf(string path, byte[] file)
@@ -222,7 +224,7 @@ public sealed class ExecutableImage
             (section.Flags & ElfSectionExecutable) != 0 ? 0x2000_0000u : 0u)).ToArray();
         return new ExecutableImage(
             path, minimum, entryPoint, checked((int)(maximum - minimum)),
-            "elf", "linux", sections, file);
+            "elf", "linux", "x64", sections, file);
     }
 
     private static ushort ReadU16(byte[] data, int offset)

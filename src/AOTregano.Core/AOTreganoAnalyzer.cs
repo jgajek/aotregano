@@ -31,8 +31,10 @@ public static class AOTreganoAnalyzer
         log.Add(
             $"Loaded {image.TargetOs} {image.Format} image " +
             $"(base=0x{image.ImageBase:X}, entry=0x{image.EntryPoint:X}).");
-        var header = ReadyToRunHeader.Locate(memory).FirstOrDefault()
-            ?? throw new UnsupportedImageException(
+        var headers = ReadyToRunHeader.Locate(memory);
+        var header = headers.Count > 0
+            ? headers[0]
+            : throw new UnsupportedImageException(
                 "No supported ReadyToRun directory was found.");
         log.Add(
             $"Using ReadyToRun header at 0x{header.Address:X} " +
