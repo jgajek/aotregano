@@ -158,6 +158,121 @@ public sealed record ReadyToRunHeader(
     }
 }
 
+public sealed record OrphanedReadyToRunDirectory(
+    ulong Address,
+    IReadOnlyList<ReadyToRunSection> Sections)
+{
+    private const int EntrySize = 24;
+
+    public ReadyToRunSection? GetSection(uint type) =>
+        Sections.FirstOrDefault(section => section.Type == type);
+
+    public static IReadOnlyList<OrphanedReadyToRunDirectory> Locate(MemoryImage memory)
+    {
+        var destinations = memory.Sections
+            .Where(section =>
+                section.RawSize == 0 && section.VirtualSize > 0 &&
+                section.Name.Contains("hydrat", StringComparison.OrdinalIgnoreCase))
+            .Select(section => checked(memory.ImageBase + section.VirtualAddress))
+            .ToHashSet();
+        if (destinations.Count == 0)
+            return [];
+
+        var results = new Dictionary<ulong, OrphanedReadyToRunDirectory>();
+        foreach (var container in memory.Sections.Where(section =>
+                     section.IsInitialized && !section.IsExecutable))
+        {
+            var containerStart = checked(memory.ImageBase + container.VirtualAddress);
+            var containerEnd = checked(containerStart + container.RawSize);
+            var cursor = checked(containerStart + ((8 - (containerStart & 7)) & 7));
+            while (cursor <= containerEnd && containerEnd - cursor >= EntrySize)
+            {
+                if (TryReadEntry(memory, cursor, out var anchor) &&
+                    anchor.Type == ReadyToRunSectionType.DehydratedData &&
+                    anchor.Size > 4 &&
+                    TryReadRelativePointer(memory, anchor.Start, out var destination) &&
+                    destinations.Contains(destination))
+                {
+                    var start = cursor;
+                    var firstType = anchor.Type;
+                    while (start >= containerStart + EntrySize &&
+                           TryReadEntry(memory, start - EntrySize, out var previous) &&
+                           previous.Type < firstType)
+                    {
+                        start -= EntrySize;
+                        firstType = previous.Type;
+                    }
+
+                    var sections = new List<ReadyToRunSection>();
+                    var entryAddress = start;
+                    uint lastType = 0;
+                    while (entryAddress <= containerEnd &&
+                           containerEnd - entryAddress >= EntrySize &&
+                           TryReadEntry(memory, entryAddress, out var entry) &&
+                           entry.Type > lastType)
+                    {
+                        sections.Add(entry);
+                        lastType = entry.Type;
+                        entryAddress += EntrySize;
+                    }
+                    if (sections.Any(section =>
+                            section.Type == ReadyToRunSectionType.FrozenObjectRegion) &&
+                        sections.Any(section =>
+                            section.Type == ReadyToRunSectionType.DehydratedData))
+                    {
+                        results.TryAdd(start, new OrphanedReadyToRunDirectory(start, sections));
+                    }
+                }
+                cursor += 8;
+            }
+        }
+        return results.Values.OrderBy(directory => directory.Address).ToArray();
+    }
+
+    private static bool TryReadEntry(
+        MemoryImage memory,
+        ulong address,
+        out ReadyToRunSection entry)
+    {
+        entry = default!;
+        if (!memory.Contains(address, EntrySize))
+            return false;
+        var type = memory.ReadU32(address);
+        var flags = memory.ReadU32(address + 4);
+        var start = memory.ReadU64(address + 8);
+        var end = memory.ReadU64(address + 16);
+        if (type is < 100 or > 399 || flags > 0xFFFF || end < start)
+            return false;
+        if (start != 0 && (!memory.Contains(start) || end == start))
+            return false;
+        if (end != 0 && !memory.Contains(end - 1))
+            return false;
+        entry = new ReadyToRunSection(type, flags, start, end);
+        return true;
+    }
+
+    private static bool TryReadRelativePointer(
+        MemoryImage memory,
+        ulong field,
+        out ulong target)
+    {
+        target = 0;
+        try
+        {
+            var delta = memory.ReadI32(field);
+            target = delta >= 0
+                ? checked(field + (ulong)delta)
+                : checked(field - (ulong)(-(long)delta));
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is InvalidDataException or OverflowException)
+        {
+            return false;
+        }
+    }
+}
+
 public sealed record PointerScan(ulong Start, ulong End, IReadOnlyList<ulong> Locations)
 {
     public bool Contains(ulong address) => Start <= address && address < End;

@@ -11,7 +11,7 @@
     "MoreWorkPossible"
   ],
   "properties": {
-    "Schema": { "const": "aotregano.run/1" },
+    "Schema": { "const": "aotregano.run/2" },
     "ToolVersion": { "type": "string" },
     "Success": { "const": true },
     "InputPath": { "type": "string" },
@@ -26,16 +26,23 @@
     "Recognition": {
       "type": "object",
       "required": [
-        "NativeAot", "ReadyToRunHeader", "MajorVersion", "MinorVersion",
+        "NativeAot", "Source", "ReadyToRunHeader", "Directory",
+        "MajorVersion", "MinorVersion",
         "DirectoryEntrySize", "DirectoryEntryType", "Sections"
       ],
       "properties": {
         "NativeAot": { "const": true },
-        "ReadyToRunHeader": { "$ref": "#/$defs/address" },
-        "MajorVersion": { "type": "integer", "minimum": 0 },
-        "MinorVersion": { "type": "integer", "minimum": 0 },
+        "Source": {
+          "enum": ["readyToRunHeader", "orphanedSectionDirectory"]
+        },
+        "ReadyToRunHeader": {
+          "oneOf": [{ "$ref": "#/$defs/address" }, { "type": "null" }]
+        },
+        "Directory": { "$ref": "#/$defs/address" },
+        "MajorVersion": { "type": ["integer", "null"], "minimum": 0 },
+        "MinorVersion": { "type": ["integer", "null"], "minimum": 0 },
         "DirectoryEntrySize": { "enum": [16, 24] },
-        "DirectoryEntryType": { "const": 1 },
+        "DirectoryEntryType": { "enum": [1, null] },
         "Sections": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": true

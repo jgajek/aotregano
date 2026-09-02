@@ -7,6 +7,11 @@ rehydrates NativeAOT metadata where required, and recovers analysis artifacts
 such as method tables, frozen strings, and frozen arrays. It never loads the
 sample as an assembly or invokes its code.
 
+When a protector or post-processor removes the `RTR` header but leaves the
+NativeAOT section directory, AOTregano can recover that orphaned directory by
+validating its ordered entries, mapped address ranges, frozen-object region,
+dehydration stream, and zero-raw `hydrated` destination.
+
 > This project is under active development. Recovered images remain untrusted
 > executable content and must be handled like the original sample.
 
@@ -36,8 +41,9 @@ resource limits, or I/O errors. In `--json` mode failures are also exactly one
 versioned JSON object on standard output; diagnostics never contaminate it.
 
 The current image support is PE32+ AMD64 and little-endian ELF64 AMD64. Both
-legacy 24-byte ReadyToRun directory entries and the 16-byte size/start entries
-used by ReadyToRun 18 are understood. When `DehydratedData` is present,
+legacy 24-byte ReadyToRun directory entries (including validated orphaned
+directories) and the 16-byte size/start entries used by ReadyToRun 18 are
+understood. When `DehydratedData` is present,
 AOTregano implements all six NativeAOT hydration commands. When it is absent,
 the manifest explicitly reports `notRequired` rather than claiming a hydration.
 

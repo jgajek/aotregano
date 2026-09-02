@@ -64,7 +64,7 @@ internal static class Tools
             using var stream = File.OpenRead(path);
             var result = new JsonObject
             {
-                ["schema"] = "aotregano.mcp.analysis/1",
+                ["schema"] = "aotregano.mcp.analysis/2",
                 ["toolVersion"] = AOTreganoAnalyzer.Version,
                 ["success"] = true,
                 ["path"] = path,
@@ -76,11 +76,13 @@ internal static class Tools
                 ["entryPoint"] = Hex(report.Image.EntryPoint),
                 ["readyToRun"] = new JsonObject
                 {
-                    ["address"] = Hex(report.Header.Address),
-                    ["majorVersion"] = report.Header.MajorVersion,
-                    ["minorVersion"] = report.Header.MinorVersion,
-                    ["directoryEntrySize"] = report.Header.EntrySize,
-                    ["sections"] = report.Header.Sections.Count
+                    ["source"] = report.RecognitionSource,
+                    ["address"] = report.Header is null ? null : Hex(report.Header.Address),
+                    ["directory"] = Hex(report.DirectoryAddress),
+                    ["majorVersion"] = report.Header?.MajorVersion,
+                    ["minorVersion"] = report.Header?.MinorVersion,
+                    ["directoryEntrySize"] = report.Header?.EntrySize ?? 24,
+                    ["sections"] = report.Sections.Count
                 },
                 ["hydration"] = report.Hydration == HydrationState.Rehydrated
                     ? "rehydrated" : "notRequired",
