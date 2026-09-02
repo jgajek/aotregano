@@ -9,7 +9,11 @@ public enum HydrationState
 public sealed record AOTreganoReport(
     ExecutableImage Image,
     MemoryImage Memory,
-    ReadyToRunHeader Header,
+    ReadyToRunHeader? Header,
+    string RecognitionSource,
+    ulong DirectoryAddress,
+    IReadOnlyList<ReadyToRunSection> Sections,
+    string MethodTableLayout,
     HydrationState Hydration,
     PointerScan PointerScan,
     IReadOnlyList<MethodTable> MethodTables,
@@ -21,7 +25,7 @@ public sealed record AOTreganoReport(
 
 public static class AOTreganoAnalyzer
 {
-    public const string Version = "0.1.0";
+    public const string Version = "0.2.0";
 
     public static AOTreganoReport Analyze(string path, ImageLimits? limits = null)
     {
@@ -32,15 +36,34 @@ public static class AOTreganoAnalyzer
             $"Loaded {image.TargetOs} {image.Format} image " +
             $"(base=0x{image.ImageBase:X}, entry=0x{image.EntryPoint:X}).");
         var headers = ReadyToRunHeader.Locate(memory);
-        var header = headers.Count > 0
-            ? headers[0]
-            : throw new UnsupportedImageException(
-                "No supported ReadyToRun directory was found.");
-        log.Add(
-            $"Using ReadyToRun header at 0x{header.Address:X} " +
-            $"(v{header.MajorVersion}.{header.MinorVersion}, entry size {header.EntrySize}).");
+        var header = headers.FirstOrDefault();
+        IReadOnlyList<ReadyToRunSection> sections;
+        string recognitionSource;
+        ulong directoryAddress;
+        if (header is not null)
+        {
+            sections = header.Sections;
+            recognitionSource = "readyToRunHeader";
+            directoryAddress = header.Address + 16;
+            log.Add(
+                $"Using ReadyToRun header at 0x{header.Address:X} " +
+                $"(v{header.MajorVersion}.{header.MinorVersion}, entry size {header.EntrySize}).");
+        }
+        else
+        {
+            var orphaned = OrphanedReadyToRunDirectory.Locate(memory).FirstOrDefault()
+                ?? throw new UnsupportedImageException(
+                    "No supported ReadyToRun header or orphaned NativeAOT section directory was found.");
+            sections = orphaned.Sections;
+            recognitionSource = "orphanedSectionDirectory";
+            directoryAddress = orphaned.Address;
+            log.Add(
+                $"Recovered orphaned NativeAOT section directory at 0x{orphaned.Address:X} " +
+                $"({orphaned.Sections.Count} legacy entries; ReadyToRun header absent).");
+        }
 
-        var dehydrated = header.GetSection(ReadyToRunSectionType.DehydratedData);
+        var dehydrated = sections.FirstOrDefault(section =>
+            section.Type == ReadyToRunSectionType.DehydratedData);
         PointerScan pointerScan;
         HydrationState hydration;
         if (dehydrated is { Size: > 0 })
@@ -64,19 +87,27 @@ public static class AOTreganoAnalyzer
             hydration = HydrationState.NotRequired;
         }
 
-        var layout = header.MajorVersion <= 8 ? "net70" : "net80";
-        var crawler = new MethodTableCrawler(memory, layout, pointerScan, log);
-        crawler.Analyze();
+        var (crawler, layout) = AnalyzeMethodTables(
+            memory,
+            pointerScan,
+            header is null ? ["net80", "net70"] :
+                [header.MajorVersion <= 8 ? "net70" : "net80"],
+            log);
         var (strings, arrays) = FrozenObjectRecovery.Recover(
             memory,
             pointerScan,
-            header.GetSection(ReadyToRunSectionType.FrozenObjectRegion),
+            sections.FirstOrDefault(section =>
+                section.Type == ReadyToRunSectionType.FrozenObjectRegion),
             crawler,
             log);
         return new AOTreganoReport(
             image,
             memory,
             header,
+            recognitionSource,
+            directoryAddress,
+            sections,
+            layout,
             hydration,
             pointerScan,
             crawler.Tables.Values.OrderBy(table => table.Address).ToArray(),
@@ -85,6 +116,35 @@ public static class AOTreganoAnalyzer
             strings,
             arrays,
             log);
+    }
+
+    private static (MethodTableCrawler Crawler, string Layout) AnalyzeMethodTables(
+        MemoryImage memory,
+        PointerScan pointerScan,
+        IReadOnlyList<string> layouts,
+        ICollection<string> log)
+    {
+        var failures = new List<string>();
+        foreach (var layout in layouts)
+        {
+            var attemptLog = new List<string>();
+            var crawler = new MethodTableCrawler(memory, layout, pointerScan, attemptLog);
+            try
+            {
+                crawler.Analyze();
+                foreach (var entry in attemptLog)
+                    log.Add(entry);
+                if (layouts.Count > 1)
+                    log.Add($"Selected {layout} method-table layout by structural validation.");
+                return (crawler, layout);
+            }
+            catch (RecoveryException exception)
+            {
+                failures.Add($"{layout}: {exception.Message}");
+            }
+        }
+        throw new RecoveryException(
+            $"No supported method-table layout matched ({string.Join("; ", failures)}).");
     }
 }
 

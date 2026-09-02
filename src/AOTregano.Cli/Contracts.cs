@@ -9,11 +9,13 @@ internal sealed record AddressValue(ulong Value, string Hex)
 
 internal sealed record RecognitionInfo(
     bool NativeAot,
-    AddressValue ReadyToRunHeader,
-    ushort MajorVersion,
-    ushort MinorVersion,
-    byte DirectoryEntrySize,
-    byte DirectoryEntryType,
+    string Source,
+    AddressValue? ReadyToRunHeader,
+    AddressValue Directory,
+    ushort? MajorVersion,
+    ushort? MinorVersion,
+    byte? DirectoryEntrySize,
+    byte? DirectoryEntryType,
     int Sections);
 
 internal sealed record HydrationInfo(string State, ulong BytesWritten);
@@ -60,7 +62,7 @@ internal sealed record RunManifest(
     IReadOnlyList<string> Blockers,
     bool MoreWorkPossible)
 {
-    public const string Current = "aotregano.run/1";
+    public const string Current = "aotregano.run/2";
 }
 
 internal sealed record RunFailure(

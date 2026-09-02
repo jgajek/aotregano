@@ -190,10 +190,12 @@ internal static class Program
         Console.WriteLine($"File       {Path.GetFileName(manifest.InputPath)}");
         Console.WriteLine($"SHA-256    {manifest.InputSha256}");
         Console.WriteLine();
-        Console.WriteLine(
-            $"NativeAOT  ReadyToRun {manifest.Recognition.MajorVersion}." +
-            $"{manifest.Recognition.MinorVersion}, " +
-            $"{manifest.Recognition.DirectoryEntrySize}-byte directory entries");
+        var recognition = manifest.Recognition.ReadyToRunHeader is null
+            ? $"orphaned {manifest.Recognition.DirectoryEntrySize}-byte section directory"
+            : $"ReadyToRun {manifest.Recognition.MajorVersion}." +
+              $"{manifest.Recognition.MinorVersion}, " +
+              $"{manifest.Recognition.DirectoryEntrySize}-byte directory entries";
+        Console.WriteLine($"NativeAOT  {recognition}");
         Console.WriteLine($"Hydration  {manifest.Hydration.State}");
         Console.WriteLine();
         Console.WriteLine($"Recovered  {manifest.Recovery.MethodTables:N0} method tables");

@@ -125,6 +125,40 @@ public sealed class ReadyToRunTests
     }
 
     [Fact]
+    public void LocatesOrphanedDirectoryAndRehydratesWithoutHeader()
+    {
+        var bytes = new byte[0x1000];
+        var destination = Base + 0x700;
+        var frozenStart = Base + 0x600;
+        var source = Base + 0x300;
+        var commandEnd = source + 7;
+        var directory = Base + 0x100;
+        WriteDirectoryEntry(bytes, directory, ReadyToRunSectionType.FrozenObjectRegion,
+            frozenStart, frozenStart + 0x40);
+        WriteDirectoryEntry(bytes, directory + 24, ReadyToRunSectionType.DehydratedData,
+            source, commandEnd);
+        WriteI32(bytes, source, checked((int)(destination - source)));
+        bytes[Index(source + 4)] = (2 << 3) | MetadataRehydrator.Copy;
+        bytes[Index(source + 5)] = (byte)'O';
+        bytes[Index(source + 6)] = (byte)'K';
+        var sections = new ImageSection[]
+        {
+            new(".rdata", 0, 0x700, 0, 0x700, 0x4000_0040),
+            new("hydrated", 0x700, 0x100, 0, 0, 0xC000_0080)
+        };
+        var memory = new MemoryImage(Base, bytes, sections);
+
+        var located = Assert.Single(OrphanedReadyToRunDirectory.Locate(memory));
+        var dehydrated = Assert.Single(located.Sections.Where(section =>
+            section.Type == ReadyToRunSectionType.DehydratedData));
+        var result = MetadataRehydrator.Rehydrate(memory, dehydrated);
+
+        Assert.Equal(directory, located.Address);
+        Assert.Equal("OK"u8.ToArray(), memory.Read(destination, 2).ToArray());
+        Assert.Equal(destination + 2, result.End);
+    }
+
+    [Fact]
     public void VaultRegressionWhenSampleIsAvailable()
     {
         var path = Environment.GetEnvironmentVariable("AOTREGANO_TEST_SAMPLE");
@@ -133,13 +167,32 @@ public sealed class ReadyToRunTests
 
         var report = AOTreganoAnalyzer.Analyze(path);
 
-        Assert.Equal(18, report.Header.MajorVersion);
+        Assert.NotNull(report.Header);
+        Assert.Equal(18, report.Header!.MajorVersion);
         Assert.Equal(5, report.Header.MinorVersion);
         Assert.Equal(16, report.Header.EntrySize);
         Assert.Equal(HydrationState.NotRequired, report.Hydration);
         Assert.Equal(2_157, report.MethodTables.Count);
         Assert.Equal(1_026, report.Strings.Count);
         Assert.Equal(31, report.Arrays.Count);
+    }
+
+    [Fact]
+    public void OrphanedDirectoryVaultRegressionWhenSampleIsAvailable()
+    {
+        var path = Environment.GetEnvironmentVariable("AOTREGANO_TEST_ORPHANED_SAMPLE");
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var report = AOTreganoAnalyzer.Analyze(path);
+
+        Assert.Null(report.Header);
+        Assert.Equal("orphanedSectionDirectory", report.RecognitionSource);
+        Assert.Equal("net80", report.MethodTableLayout);
+        Assert.Equal(HydrationState.Rehydrated, report.Hydration);
+        Assert.Equal(2_399, report.MethodTables.Count);
+        Assert.Equal(1_163, report.Strings.Count);
+        Assert.Equal(33, report.Arrays.Count);
     }
 
     private static MemoryImage Memory(byte[] entry, byte entrySize, ushort major)
@@ -162,4 +215,14 @@ public sealed class ReadyToRunTests
 
     private static void WriteI32(byte[] bytes, ulong address, int value) =>
         BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(Index(address)), value);
+
+    private static void WriteDirectoryEntry(
+        byte[] bytes, ulong address, uint type, ulong start, ulong end)
+    {
+        var offset = Index(address);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(offset), type);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(offset + 4), 1);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(offset + 8), start);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(offset + 16), end);
+    }
 }

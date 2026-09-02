@@ -29,7 +29,7 @@ internal static class BundleWriter
             Path.Combine(directory, "annotations.jsonl"),
             Path.Combine(directory, "mapped-image.bin"));
 
-        var sections = report.Header.Sections.Select(section => new SectionRow(
+        var sections = report.Sections.Select(section => new SectionRow(
             section.Type,
             section.Name,
             section.Flags,
@@ -110,12 +110,14 @@ internal static class BundleWriter
             report.Image.MappedSize,
             new RecognitionInfo(
                 true,
-                AddressValue.Of(report.Header.Address),
-                report.Header.MajorVersion,
-                report.Header.MinorVersion,
-                report.Header.EntrySize,
-                report.Header.EntryType,
-                report.Header.Sections.Count),
+                report.RecognitionSource,
+                report.Header is null ? null : AddressValue.Of(report.Header.Address),
+                AddressValue.Of(report.DirectoryAddress),
+                report.Header?.MajorVersion,
+                report.Header?.MinorVersion,
+                report.Header?.EntrySize ?? 24,
+                report.Header?.EntryType,
+                report.Sections.Count),
             new HydrationInfo(
                 report.Hydration == HydrationState.Rehydrated ? "rehydrated" : "notRequired",
                 bytesWritten),
